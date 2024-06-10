@@ -1,7 +1,7 @@
 from django.test import TestCase
 import datetime
 from django.utils import timezone
-from .models import Question
+from .models import Question, Choice
 from django.urls import reverse
 
 # Create your tests here.
@@ -95,10 +95,22 @@ class QuestionIndexViewTests(TestCase):
         question1 = create_question(question_text="Past question 1.", days=-30)
         question2 = create_question(question_text="Past question 2.", days=-5)
         response = self.client.get(reverse("polls:index"))
-        print(response.context["latest_question_list"])
         self.assertQuerysetEqual(
             response.context["latest_question_list"],
             [question2, question1],
+        )
+    
+    def test_no_choices_question(self):
+        """
+        Ensure that only question with choice(s) that is shown
+        """
+        q1 = create_question("Question 1", days=-5)
+        q1.choice_set.create(choice_text="Q1 Choice 1")
+        q2 = create_question("Question 2", days=-10)
+        response = self.client.get(reverse("polls:index"))
+        self.assertEqual(
+            response.context["latest_question_list"],
+            [q1]
         )
     
 class QuestionDetailViewTests(TestCase):
@@ -119,5 +131,18 @@ class QuestionDetailViewTests(TestCase):
         """
         past_question = create_question(question_text="Past Question.", days=-5)
         url = reverse("polls:detail", args=(past_question.id,))
+        response = self.client.get(url)
+        self.assertContains(response, past_question.question_text)
+
+class QuestionResultsViewTests(TestCase):
+    def test_future_question(self):
+        future_question = create_question("Future Question", 10)
+        url = reverse("polls:results", args=(future_question.id,))
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+    
+    def test_past_question(self):
+        past_question = create_question("Past Question", -10)
+        url = reverse("polls:results", args=(past_question.id,))
         response = self.client.get(url)
         self.assertContains(response, past_question.question_text)
